@@ -6,13 +6,11 @@ import {
   REDIRECT, EMAIL_AND_PASSWORD, CREATE_USER, POPUP, ANONYMOUSLY, SIGN_OUT,
   GET_REDIRECT_RESULT,
 } from './types';
-import { convertUserToUserCredential } from './convertUserToUserCredential';
-import { defaultUserCredential } from './defaultUserCredential';
 
-export function createUserCredential$(
+export function createUser$(
     method: string,
     authenticationType: AuthenticationType,
-    firebaseInstance: any): Stream<firebase.auth.UserCredential>
+    firebaseInstance: any): Stream<firebase.User | null>
 {
   // Ordered most common on top for optimisation.
   // We use if-statements instead of switch, because few conditionals
@@ -21,8 +19,7 @@ export function createUserCredential$(
     return getRedirectResult(firebaseInstance);
 
   if (method === REDIRECT)
-    return redirectSignIn(authenticationType, firebaseInstance)
-      .constant(defaultUserCredential);
+    return redirectSignIn(authenticationType, firebaseInstance);
 
   if (method === EMAIL_AND_PASSWORD)
     return emailAndPasswordSignIn(authenticationType, firebaseInstance);
@@ -31,8 +28,7 @@ export function createUserCredential$(
     const { email, password } = authenticationType as CreateUserAuthentication;
 
     return fromFirebasePromise<firebase.User>(
-      firebaseInstance.auth().createUserWithEmailAndPassword(email, password))
-      .map(convertUserToUserCredential(new firebase.auth.EmailAuthProvider()));
+      firebaseInstance.auth().createUserWithEmailAndPassword(email, password));
   }
 
   if (method === POPUP)
@@ -40,44 +36,51 @@ export function createUserCredential$(
 
   if (method === ANONYMOUSLY)
     return fromFirebasePromise<firebase.User>(
-      firebaseInstance.auth().signInAnonymously())
-      .map((user: firebase.User) => ({ user, credential: null }));
+      firebaseInstance.auth().signInAnonymously());
 
   if (method === SIGN_OUT)
     return fromFirebasePromise<void>(firebaseInstance.auth().signOut())
-      .constant(defaultUserCredential);
+      .constant(null);
 
-  return just(defaultUserCredential);
+  return just(null);
 }
 
 function emailAndPasswordSignIn(authenticationInput: AuthenticationType, firebaseInstance: any) {
   const { email, password } = (authenticationInput as EmailAndPasswordAuthentication);
 
   return fromFirebasePromise<firebase.User>(
-    firebaseInstance.auth().signInWithEmailAndPassword(email, password))
-    .map(convertUserToUserCredential(new firebase.auth.EmailAuthProvider()));
+    firebaseInstance.auth().signInWithEmailAndPassword(email, password));
 }
 
 function popupSignIn(authenticationInput: AuthenticationType, firebaseInstance: any) {
   const { provider } = authenticationInput as PopupAuthentication;
 
-  return fromFirebasePromise<firebase.auth.UserCredential>(
-    firebaseInstance.auth().signInWithPopup(provider));
+  return fromFirebasePromise<firebase.User>(
+    firebaseInstance.auth().signInWithPopup(provider).then(convertUserCredentialToUser));
 }
 
 function redirectSignIn(authenticationInput: AuthenticationType, firebaseInstance: any) {
   const { provider } = authenticationInput as PopupAuthentication;
 
-  return fromFirebasePromise<firebase.auth.UserCredential>(
-    firebaseInstance.auth().signInWithRedirect(provider));
+  return fromFirebasePromise<firebase.User>(
+    firebaseInstance.auth().signInWithRedirect(provider)
+      .then(convertUserCredentialToUser),
+  );
 }
 
 function getRedirectResult(firebaseInstance: any) {
-  return fromFirebasePromise<firebase.auth.UserCredential>(
-    firebaseInstance.auth().getRedirectResult(),
+  return fromFirebasePromise<firebase.User>(
+    firebaseInstance.auth().getRedirectResult()
+      .then(convertUserCredentialToUser),
   );
 }
 
 function fromFirebasePromise<T>(firebasePromise: firebase.Promise<T>): Stream<T> {
   return just<firebase.Promise<T>>(firebasePromise).await<T>();
+}
+
+function convertUserCredentialToUser (
+  userCredential: firebase.auth.UserCredential): firebase.User | null
+{
+  return userCredential.user;
 }

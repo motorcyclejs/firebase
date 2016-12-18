@@ -54,5 +54,5 @@ export type AuthenticationType =
 
 export type Authentication = {
   error: AuthenticationError | null;
-  userCredential: firebase.auth.UserCredential;
+  user: firebase.User | null;
 };

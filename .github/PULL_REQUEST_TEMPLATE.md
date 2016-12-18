@@ -10,7 +10,7 @@ To help speed up the process of merging your code, check the following:
 <!--
 Please Continue to describe your fix / change citing an issue if possible.
 
-If there are BREAKING CHANGES, please use one of the following to 
+If there are BREAKING CHANGES, please use one of the following to
 communicate the changes that have occured.
 
 

@@ -1,6 +1,18 @@
 import firebase = require('firebase');
-import { defaultUserCredential } from '../../src/authentication/defaultUserCredential';
-import { convertUserToUserCredential } from '../../src/authentication/convertUserToUserCredential';
+
+function convertUserToUserCredential (provider: firebase.auth.AuthProvider) {
+  return function (user: firebase.User) {
+    return {
+      user,
+      credential: { provider },
+    };
+  };
+}
+
+const defaultUserCredential = {
+  user: null,
+  credential: null,
+};
 
 export class MockFirebase {
   private _mockAuth: MockAuth;
@@ -16,6 +28,8 @@ export class MockFirebase {
 
 export class MockAuth {
   public authenticationOccured: boolean = false;
+  private authStateListeners: Array<(user: firebase.User) => any> = [];
+
   constructor(private email: string, private error: string) {}
 
   public signInAnonymously(): firebase.Promise<firebase.User> {
@@ -50,6 +64,18 @@ export class MockAuth {
 
   public createUserWithEmailAndPassword(email: string): firebase.Promise<firebase.User> {
     return this.checkForError(makeUser(email, false));
+  }
+
+  public onAuthStateChanged(next: (user: firebase.User) => any): Function {
+    this.authStateListeners.push(next);
+
+    return () => {
+      this.authStateListeners = this.authStateListeners.filter(x => x !== next);
+    };
+  }
+
+  public emitAuthStateChange (user: firebase.User) {
+    this.authStateListeners.forEach(listener => listener(user));
   }
 
   private checkForError(returnValue: any) {

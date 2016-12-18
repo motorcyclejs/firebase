@@ -55,7 +55,7 @@ const GoogleAuth = { method: REDIRECT, provider: new firebase.auth.GoogleProvide
 ```typescript
 export type Authentication = {
   error: AuthenticationError | null;
-  userCredential: firebase.auth.UserCredential;
+  userCredential: firebase.User;
 };
 ```
 

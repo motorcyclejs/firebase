@@ -1,23 +1,29 @@
-import { Stream, just } from 'most';
+import { Stream, Sink, Scheduler, just } from 'most';
 import hold from '@most/hold';
 import * as firebase from 'firebase';
 import { AuthenticationType, Authentication } from './types';
-import { createUserCredential$ } from './createUserCredential$';
-import { defaultUserCredential } from './defaultUserCredential';
+import { createUser$ } from './createUser$';
 import { AuthenticationError } from './AuthenticationError';
+import { convertUserToAuthentication } from './convertUserToAuthentication';
+import { authStateChange } from './authStateChange';
 
 export function makeFirebaseAuthenticationDriver(firebaseInstance: any) {
-  return function firebaseAuthenticationDriver(sink$: Stream<AuthenticationType>):
-      Stream<Authentication> {
+
+  return function firebaseAuthenticationDriver(
+    sink$: Stream<AuthenticationType>): Stream<Authentication>
+  {
+    const authStateChange$ = authStateChange(firebaseInstance);
+
     const authentication$ = sink$.map((authenticationInput) => {
       const method = authenticationInput.method;
 
-      return createUserCredential$(method, authenticationInput, firebaseInstance)
-        .map(convertUserCredentialToAuthenticationOutput)
+      return createUser$(method, authenticationInput, firebaseInstance)
+        .map(convertUserToAuthentication)
         .recoverWith<firebase.auth.Error>(createDefaultAuthenticationOutput$);
     })
       .switch()
-      .startWith(convertUserCredentialToAuthenticationOutput(defaultUserCredential))
+      .merge(authStateChange$)
+      .startWith(convertUserToAuthentication(null))
       .thru(hold);
 
     authentication$.drain();
@@ -26,17 +32,9 @@ export function makeFirebaseAuthenticationDriver(firebaseInstance: any) {
   };
 }
 
-function convertUserCredentialToAuthenticationOutput(
-    userCredential: firebase.auth.UserCredential): Authentication  {
-  return {
-    error: null,
-    userCredential,
-  };
-}
-
 function createDefaultAuthenticationOutput$(error: firebase.auth.Error) {
   return just<Authentication>({
     error: new AuthenticationError(error.code, error.message),
-    userCredential: defaultUserCredential,
+    user: null,
   });
 }
