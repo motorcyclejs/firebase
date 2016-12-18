@@ -1,6 +1,6 @@
 {
   "name": "@motorcycle/firebase",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Firebase Drivers for Motorcycle.js",
   "main": "lib",
   "jsnext:main": "lib.es2015/index.js",
